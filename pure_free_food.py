@@ -3,14 +3,29 @@ from bs4 import BeautifulSoup
 import json
 import requests
 
-def send_message():
+class EatClubDish:
+    def __init__(self, person, dish_name, restaurant, star_str, star_num, rating_num, description, icons, image_url, address, location):
+        self.person = person
+        self.dish_name = dish_name
+        self.restaurant = restaurant
+        self.star_str = star_str
+        self.star_num = star_num
+        self.rating_num = rating_num
+        self.description = description
+        self.icons = icons
+        self.image_url = image_url
+        self.address = address
+        self.location = location
+
+
+def send_message(dish):
     webhook_url = 'https://hooks.slack.com/services/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'
     slack_data = {"blocks": [
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "Hello, Assistant to the Regional Manager Dwight! *Michael Scott* wants to know where you'd like to take the Paper Company investors to dinner tonight.\n\n *Please select a restaurant:*"
+                "text": "Hi! *{}* provides a free food!\n\n *Press Reserve button if you want it:*".format(dish.person)
             }
         },
         {
@@ -20,24 +35,23 @@ def send_message():
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Farmhouse Thai Cuisine*\n:star::star::star::star: 1528 reviews\n They do have some vegan options, like the roti and curry, plus they have a ton of salad stuff and noodles can be ordered without meat!! They have something for everyone here"
+                "text": "*{}* from {}\n{} {}   {} Ratings\n {}\n\n{}"
+                    .format(dish.dish_name, dish.restaurant, dish.star_str, dish.star_num, dish.rating_num, dish.description, dish.icons)
             },
             "accessory": {
                 "type": "image",
-                "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/c7ed05m9lC2EmA3Aruue7A/o.jpg",
-                "alt_text": "alt text for image"
+                "image_url": "{}".format(dish.image_url),
+                "alt_text": "{}".format(dish.dish_name)
             }
         },
-        { 
+        {
+            "type": "divider"
+        },
+        {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Ler Ros*\n:star::star::star::star: 2082 reviews\n I would really recommend the  Yum Koh Moo Yang - Spicy lime dressing and roasted quick marinated pork shoulder, basil leaves, chili & rice powder."
-            },
-            "accessory": {
-                "type": "image",
-                "image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/DawwNigKJ2ckPeDeDM7jAg/o.jpg",
-                "alt_text": "alt text for image"
+                "text": "Address: *{}*\nLocation: *{}*\n".format(dish.address, dish.location)
             }
         },
         {
@@ -50,25 +64,7 @@ def send_message():
                     "type": "button",
                     "text": {
                         "type": "plain_text",
-                        "text": "Farmhouse",
-                        "emoji": True
-                    },
-                    "value": "click_me_123"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Kin Khao",
-                        "emoji": True
-                    },
-                    "value": "click_me_123"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Ler Ros",
+                        "text": "Reserve!",
                         "emoji": True
                     },
                     "value": "click_me_123"
@@ -83,6 +79,7 @@ def send_message():
     )
 
     print(response.status_code, response.text)
+
 
 def search_dish_link(dish_name):
     query = dish_name + " eat club"
@@ -100,5 +97,35 @@ def search_dish_link(dish_name):
         if not nodes: return None
         return "https://www.eatclub.com" + nodes[0].parent.parent['href']
 
+
+def get_dish(dish_url, user_dict):
+    # response = requests.get(dish_url)
+    # print(dish_url)
+    # dish_soup = BeautifulSoup(response.content, features="html.parser")
+    # print(dish_soup.html)
+    # nodes = dish_soup.find_all("span", class_="star-rating")
+    # print(nodes[0].text)
+
+    return EatClubDish(
+        person="Michael Scott", 
+        dish_name=user_dict.get("food"), 
+        restaurant=user_dict.get("restaurant"), 
+        star_str=":star::star::star::star:", 
+        star_num=4.1, 
+        rating_num=1113,
+        description="3 soft corn tacos served traditionally with grilled chicken, marinated in achiote, Mayan seasoning with dry oregano, black pepper, cumin. They are topped off with cilantro, onion and roasted tomatillo salsa. Enjoy traditional Mexican rice and pinto beans served on the side.",
+        icons=":spicy:",
+        image_url="https://myeatclub.a.ssl.fastly.net/im/11660/1493159739000/640x460/60/",
+        address=user_dict.get("address"),
+        location=user_dict.get("location"))
+
+
 if __name__ == "__main__":
-    print(search_dish_link("Chicken Katsu Plate"))
+    user_dict = {
+        "food": "food",
+        "restaurant": "pure",
+        "address": "650",
+        "location": "K3"
+    }
+    eat_club_dish = get_dish(search_dish_link("Chicken Katsu Plate"), user_dict)
+    send_message(eat_club_dish)

@@ -6,7 +6,7 @@ import re
 def grab_info(html_text):
     soup = BeautifulSoup(html_text, 'html.parser')
     infos = {}
-    if "www.eatclub.com" not in html_text:
+    if b"www.eatclub.com" not in html_text:
         return None
     for table in soup.find_all('table'):
         if "Your order is ready" in str(table):

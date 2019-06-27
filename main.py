@@ -7,6 +7,7 @@ Main loop for our PureFreeFood app
 import time
 from eatclub_parser import grab_info as parse_msg
 from email_fetcher import EmailFetcher
+from pure_free_food import *
 
 
 def main():
@@ -19,6 +20,8 @@ def main():
             parsed_msg = parse_msg(msg_content)
             print('NEW MESSAGE')
             print(parsed_msg)
+            eat_club_dish = get_dish(search_dish_link(parsed_msg.get("food")), parsed_msg)
+            send_message(eat_club_dish)
             fetcher.mark_message_read(msg_id)
         time.sleep(10)
 
