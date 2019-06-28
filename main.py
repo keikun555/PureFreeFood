@@ -22,7 +22,8 @@ def main():
             parsed_msg['sender_address'] = message['sender_address']
             print('NEW MESSAGE')
             print(parsed_msg)
-            eat_club_dish = pff.get_dish(pff.search_dish_link(parsed_msg.get("food")), parsed_msg)
+            dish_dict, page_url = pff.search_dish_link(parsed_msg.get("food"))
+            eat_club_dish = pff.get_dish(dish_dict, page_url, parsed_msg)
             pff.send_message(eat_club_dish)
             fetcher.mark_message_read(msg_id)
         time.sleep(10)
