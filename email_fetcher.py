@@ -13,6 +13,8 @@ from google.auth.transport.requests import Request
 from apiclient import errors
 import base64
 import shelve
+import email
+import re
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -43,6 +45,7 @@ class EmailFetcher(object):
 
         self.service = build('gmail', 'v1', credentials=creds)
         self.msg_id_db = shelve.open('msg_id_shelf')
+        self.sender_regex = re.compile('(.*) <(.*@purestorage\.com)>')
 
     def __del__(self):
         self.msg_id_db.close()
@@ -59,15 +62,34 @@ class EmailFetcher(object):
         return filter(lambda key: key not in self.msg_id_db, msg_ids)
 
     def get_message(self, msg_id):
-        """Get a Message and returns a HTML Message.
+        """Get a Message and returns a Mime Message.
 
         Args:
           msg_id: The ID of the Message required.
 
         Returns:
-          A HTML Message, consisting of data from Message.
+          A dictionary {
+            'sender_name' (str): The name of the sender
+            'sender_address' (str): The address of the sender
+            'html_content' (HTML str): The HTML content of the message in string format
+          }
         """
-        return GetHTMLMessage(self.service, 'me', msg_id)
+        message = {}  # to return
+        # get the mime message
+        mime_message = GetMimeMessage(self.service, 'me', msg_id)
+        # set send_name and send_address
+        sender = mime_message['From']
+        result = self.sender_regex.match(sender)
+        if not result:
+            raise ValueError(
+                'EmailFetcher.get_message: Unable to parse sender %s' % sender)
+        message['sender_name'], message['sender_address'] = result.groups()
+        # set html_content
+        message['html_content'] = ''
+        for part in mime_message.get_payload():
+            if part.get_content_type() == 'text/html':
+                message['html_content'] += part.get_payload()
+        return message
 
     def mark_message_read(self, msg_id):
         """Marks the given Message unread.
@@ -135,6 +157,33 @@ def GetHTMLMessage(service, user_id, msg_id):
         print('An error occurred: %s' % error)
 
 
+def GetMimeMessage(service, user_id, msg_id):
+    """Get a Message and use it to create a MIME Message.
+
+    Args:
+      service: Authorized Gmail API service instance.
+      user_id: User's email address. The special value "me"
+      can be used to indicate the authenticated user.
+      msg_id: The ID of the Message required.
+
+    Returns:
+      A MIME Message, consisting of data from Message.
+    """
+    try:
+        message = service.users().messages().get(userId=user_id, id=msg_id,
+                                                 format='raw').execute()
+
+        print('Message snippet: %s' % message['snippet'])
+
+        msg_str = base64.urlsafe_b64decode(message['raw'].encode('ASCII'))
+
+        mime_msg = email.parser.BytesParser().parsebytes(msg_str)
+
+        return mime_msg
+    except errors.HttpError as error:
+        print('An error occurred: %s' % error)
+
+
 def ModifyMessage(service, user_id, msg_id, msg_labels):
     """Modify the Labels on the given Message.
 
@@ -164,32 +213,10 @@ def main():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
     """
-    creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server()
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-
-    service = build('gmail', 'v1', credentials=creds)
-
-    # Call the Gmail API
-    unread_messages = ListMessagesMatchingQuery(
-        service, 'me', query='is:unread')
-    for msg in unread_messages:
-        print(GetHTMLMessage(service, 'me', msg['id']))
+    fetcher = EmailFetcher()
+    unread_ids = fetcher.get_unread_message_ids()
+    for msg_id in unread_ids:
+        print(fetcher.get_message(msg_id))
 
 
 if __name__ == '__main__':
