@@ -28,9 +28,11 @@ def send_message(dish):
     webhook_url = 'https://hooks.slack.com/services/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'
     title = "Go grab" if dish.sender == None else dish.sender + " shares"
     dish_loc = "Address: *{}*\nLocation: *{}*".format(dish.address, dish.location)
-    sides_str = ""
+    sides_str = "No sides"
     for i in range(len(dish.sides)):
         sides_str += "{}\nLocation: *{}*\n".format(dish.sides[i], dish.side_locations[i])
+
+    print(sides_str)
 
     slack_data = {"blocks": [
         {
@@ -174,8 +176,8 @@ if __name__ == "__main__":
         "location": "K3",
         "anonymous": False,
         "sender_name": "Mike",
-        "sides": ["Orange Juice (Side)", "Beans (Side)"],
-        "side_locations": ["D3", "D3"]
+        "sides": [],
+        "side_locations": []
     }
     dish_dict, page_url = search_dish_link("Chicken Tostada Salad")
     eat_club_dish = get_dish(dish_dict, page_url, user_dict)
