@@ -18,8 +18,6 @@ def grab_info(html_text):
             infos['food'] = table.find('strong').text.strip()
             infos['restaurant'] = re.findall(
                 'from\\s+(.*)', table.text)[0].strip()
-    if 'food' not in infos or 'address' not in infos or 'restaurant' not in infos:
-        return None
     # get sides if exists
     infos['sides'] = []
     infos['side_locations'] = []
@@ -32,7 +30,6 @@ def grab_info(html_text):
                     lambda s: s.strip(), table.strings)))
             if 'Your order is ready' in str(table):
                 past_address = True
-        infos['food'] = []
         for i in range(0, len(food_info), 2):
             food, loc = food_info[i], food_info[i + 1]
             if '(side)' in food:
