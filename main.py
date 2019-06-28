@@ -16,8 +16,10 @@ def main():
         print('checking for new messages...')
         unread_message_ids = fetcher.get_unread_message_ids()
         for msg_id in unread_message_ids:
-            msg_content = fetcher.get_message(msg_id)
-            parsed_msg = parse_msg(msg_content)
+            message = fetcher.get_message(msg_id)
+            parsed_msg = parse_msg(message['html_content'])
+            parsed_msg['sender_name'] = message['sender_name']
+            parsed_msg['sender_address'] = message['sender_address']
             print('NEW MESSAGE')
             print(parsed_msg)
             eat_club_dish = get_dish(search_dish_link(parsed_msg.get("food")), parsed_msg)
