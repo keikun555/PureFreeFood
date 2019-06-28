@@ -79,6 +79,7 @@ class EmailFetcher(object):
         mime_message = GetMimeMessage(self.service, 'me', msg_id)
         # set send_name and send_address
         sender = mime_message['From']
+        print(sender)
         result = self.sender_regex.match(sender)
         if not result:
             raise ValueError(
