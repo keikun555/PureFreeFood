@@ -6,8 +6,8 @@ import requests
 
 class EatClubDish:
     def __init__(self, dish_name, restaurant, star_str, star_num,
-    rating_num, description, icons, image_url, page_url, address,
-    location, sides, side_locations, sender):
+                 rating_num, description, icons, image_url, page_url, address,
+                 location, sides, side_locations, sender):
         self.dish_name = dish_name
         self.restaurant = restaurant
         self.star_str = star_str
@@ -26,11 +26,13 @@ class EatClubDish:
 
 def send_message(dish):
     webhook_url = 'https://hooks.slack.com/services/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'
-    title = "Go grab" if dish.sender == None else dish.sender + " shares"
-    dish_loc = "Address: *{}*\nLocation: *{}*".format(dish.address, dish.location)
+    title = "Go grab" if dish.sender is None else dish.sender + " shares"
+    dish_loc = "Address: *{}*\nLocation: *{}*".format(
+        dish.address, dish.location)
     sides_str = ""
     for i in range(len(dish.sides)):
-        sides_str += "{}\nLocation: *{}*\n".format(dish.sides[i], dish.side_locations[i])
+        sides_str += "{}\nLocation: *{}*\n".format(
+            dish.sides[i], dish.side_locations[i])
 
     slack_data = {"blocks": [
         {
@@ -38,6 +40,7 @@ def send_message(dish):
             "text": {
                 "type": "mrkdwn",
                 "text": "{} a free food!".format(title)
+                # *Press Reserve button if you want it:*"
             }
         },
         {
@@ -121,6 +124,18 @@ def search_dish_link(dish_name):
 
 
 def get_dish(dish_url, page_url, user_dict):
+    return EatClubDish(
+        dish_name='Mandarin Citrus Chicken with Rice',
+        restaurant='Kung Pao Kitchen',
+        star_str=':star:' * round(3.6),
+        star_num=3.6,
+        rating_num=456,
+        description='A simple Chinese-American trio of sweet and tangy citrus chicken. Served with jasmine rice and sauteed vegetables.',
+        icons=':dairy_free:',
+        image_url='https://myeatclub.a.ssl.fastly.net/im/16393/1551895001000/600x600/60/',
+        address='650 Castro Street 4th Floor',
+        location='L2'
+    )
     dish_dict = requests.get(dish_url).json()
 
     # stars
@@ -145,9 +160,8 @@ def get_dish(dish_url, page_url, user_dict):
 
     # sender
     sender = None
-    if user_dict.get("anonymous") == False:
+    if not user_dict.get("anonymous"):
         sender = user_dict.get("sender_name")
-
 
     return EatClubDish(
         dish_name=user_dict.get("food"),
