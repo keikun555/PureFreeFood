@@ -108,7 +108,7 @@ def search_dish_link(dish_name):
             res_url = j
             break
     if not res_url:
-        return None
+        return None, None
     if page_url_prefix in res_url:
         return api_url_prefix + res_url.split("/")[-2] + "/", res_url
     else:
@@ -117,25 +117,29 @@ def search_dish_link(dish_name):
             response.content, features="html.parser")
         nodes = restaurant_soup.find_all(text=dish_name)
         if not nodes:
-            return None
+            return None, None
         dish_suffix = nodes[0].parent.parent['href']
         page_url = page_url_prefix + dish_suffix
         return api_url_prefix + dish_suffix.split("/")[-2] + "/", page_url
 
 
 def get_dish(dish_url, page_url, user_dict):
-    return EatClubDish(
-        dish_name='Mandarin Citrus Chicken with Rice',
-        restaurant='Kung Pao Kitchen',
-        star_str=':star:' * round(3.6),
-        star_num=3.6,
-        rating_num=456,
-        description='A simple Chinese-American trio of sweet and tangy citrus chicken. Served with jasmine rice and sauteed vegetables.',
-        icons=':dairy_free:',
-        image_url='https://myeatclub.a.ssl.fastly.net/im/16393/1551895001000/600x600/60/',
-        address='650 Castro Street 4th Floor',
-        location='L2'
-    )
+    # return EatClubDish(
+    #     dish_name='Mandarin Citrus Chicken with Rice',
+    #     restaurant='Kung Pao Kitchen',
+    #     star_str=':star:' * round(3.6),
+    #     star_num=3.6,
+    #     rating_num=456,
+    #     description='A simple Chinese-American trio of sweet and tangy citrus chicken. Served with jasmine rice and sauteed vegetables.',
+    #     icons=':dairy_free:',
+    #     image_url='https://myeatclub.a.ssl.fastly.net/im/16393/1551895001000/600x600/60/',
+    #     page_url='www.google.com',
+    #     address='650 Castro Street 4th Floor',
+    #     location='L2',
+    #     sides=[],
+    #     side_locations=[],
+    #     sender='Kei Imada'
+    # )
     dish_dict = requests.get(dish_url).json()
 
     # stars
