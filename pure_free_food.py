@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import json
 import requests
 
+
 class EatClubDish:
     def __init__(self, dish_name, restaurant, star_str, star_num, rating_num, description, icons, image_url, address, location):
         self.dish_name = dish_name
@@ -35,9 +36,9 @@ def send_message(dish):
             "text": {
                 "type": "mrkdwn",
                 "text": "*{}* from {}\n{} {}\n\n{}"
-                    .format(dish.dish_name, dish.restaurant, 
-                    "" if dish.star_num == None else dish.star_str + " " + str(dish.star_num) + "   " + str(dish.rating_num) + " Ratings\n",
-                         dish.description, dish.icons)
+                    .format(dish.dish_name, dish.restaurant,
+                            "" if dish.star_num is None else f'{dish.star_str} {dish.star_num}   {dish.rating_num} Ratings\n',
+                            dish.description, dish.icons)
             },
             "accessory": {
                 "type": "image",
@@ -85,19 +86,21 @@ def send_message(dish):
 def search_dish_link(dish_name):
     query = dish_name + " eat club"
     res_url = ""
-    for j in search(query, tld="com", num=5, stop=5, pause=2): 
+    for j in search(query, tld="com", num=5, stop=5, pause=2):
         if "https://www.eatclub.com/s/restaurant/" in j or "https://www.eatclub.com/dish/" in j:
             res_url = j
             break
-    if not res_url: 
+    if not res_url:
         return None
-    if "https://www.eatclub.com/dish/" in res_url: 
+    if "https://www.eatclub.com/dish/" in res_url:
         return "https://www.eatclub.com/api/items/" + res_url.split("/")[-2] + "/"
     else:
         response = requests.get(res_url)
-        restaurant_soup = BeautifulSoup(response.content, features="html.parser")
+        restaurant_soup = BeautifulSoup(
+            response.content, features="html.parser")
         nodes = restaurant_soup.find_all(text=dish_name)
-        if not nodes: return None
+        if not nodes:
+            return None
         return "https://www.eatclub.com/api/items/" + nodes[0].parent.parent['href'].split("/")[-2] + "/"
 
 
@@ -107,22 +110,22 @@ def get_dish(dish_url, user_dict):
     star_str = ""
     rounded_star = None
     rating = dish_dict.get("average_rating")
-    if not rating == None:
+    if rating is not None:
         rounded_star = round(rating, 1)
         for i in range(round(rating)):
             star_str += ":star:"
 
     tag_str = ""
     tags = dish_dict.get("tags")
-    if not tags == None:
+    if tags is not None:
         for tag in tags:
             tag_str += ":{}:".format(tag.get("value_code"))
 
     return EatClubDish(
-        dish_name=user_dict.get("food"), 
-        restaurant=user_dict.get("restaurant"), 
-        star_str=star_str, 
-        star_num=rounded_star, 
+        dish_name=user_dict.get("food"),
+        restaurant=user_dict.get("restaurant"),
+        star_str=star_str,
+        star_num=rounded_star,
         rating_num=dish_dict.get("review_count"),
         description=dish_dict.get("description"),
         icons=tag_str,
@@ -138,5 +141,6 @@ if __name__ == "__main__":
         "address": "650",
         "location": "K3"
     }
-    eat_club_dish = get_dish(search_dish_link("Chicken Tostada Salad"), user_dict)
+    eat_club_dish = get_dish(search_dish_link(
+        "Chicken Tostada Salad"), user_dict)
     send_message(eat_club_dish)
