@@ -42,4 +42,6 @@ def grab_info(html_text):
         infos['anonymous'] = True
     else:
         infos['anonymous'] = False
+    if 'food' not in infos or 'location' not in infos or 'restaurant' not in infos or 'address' not in infos:
+        return None
     return infos
