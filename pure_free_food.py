@@ -26,15 +26,13 @@ class EatClubDish:
 
 def send_message(dish):
     webhook_url = 'https://hooks.slack.com/services/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'
-    title = "Go grab" if dish.sender == None else dish.sender + " shares"
+    title = "Go grab" if dish.sender is None else dish.sender + " shares"
     dish_loc = "Address: *{}*\nLocation: *{}*".format(dish.address, dish.location)
     sides_str = "No sides"
 
     for i in range(len(dish.sides)):
         sides_str += "{}\nLocation: *{}*\n".format(
             dish.sides[i], dish.side_locations[i])
-
-    print(sides_str)
 
     slack_data = {"blocks": [
         {
@@ -126,22 +124,22 @@ def search_dish_link(dish_name):
 
 
 def get_dish(dish_url, page_url, user_dict):
-    # return EatClubDish(
-    #     dish_name='Mandarin Citrus Chicken with Rice',
-    #     restaurant='Kung Pao Kitchen',
-    #     star_str=':star:' * round(3.6),
-    #     star_num=3.6,
-    #     rating_num=456,
-    #     description='A simple Chinese-American trio of sweet and tangy citrus chicken. Served with jasmine rice and sauteed vegetables.',
-    #     icons=':dairy_free:',
-    #     image_url='https://myeatclub.a.ssl.fastly.net/im/16393/1551895001000/600x600/60/',
-    #     page_url='www.google.com',
-    #     address='650 Castro Street 4th Floor',
-    #     location='L2',
-    #     sides=[],
-    #     side_locations=[],
-    #     sender='Kei Imada'
-    # )
+    return EatClubDish(
+        dish_name='Mandarin Citrus Chicken with Rice',
+        restaurant='Kung Pao Kitchen',
+        star_str=':star:' * round(3.6),
+        star_num=3.6,
+        rating_num=456,
+        description='A simple Chinese-American trio of sweet and tangy citrus chicken. Served with jasmine rice and sauteed vegetables.',
+        icons=':dairy_free:',
+        image_url='https://myeatclub.a.ssl.fastly.net/im/16393/1551895001000/600x600/60/',
+        page_url='www.google.com',
+        address='650 Castro Street 4th Floor',
+        location='L2',
+        sides=[],
+        side_locations=[],
+        sender='Kei Imada'
+    )
     dish_dict = requests.get(dish_url).json()
 
     # stars
