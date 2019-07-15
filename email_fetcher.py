@@ -78,6 +78,10 @@ class EmailFetcher(object):
         msg_ids = map(lambda m: m['id'], unread_messages)
         return msg_ids
 
+    def mark_message_read(self, msg_id):
+        '''Marks a message as read in gmail account'''
+        return ModifyMessage(self.service, 'me', msg_id, self.read_labels)
+
     def get_eatclub_message(self, msg_id):
         """Get a Message and returns a Mime Message if it's an EATClub message.
 
@@ -117,7 +121,8 @@ class EmailFetcher(object):
                         mime_message['Date'], self.forward_date_format2).replace(tzinfo=None)
                 content = part.get_payload()
                 if self._is_valid_eatclub_content(content, forward_date):
-                    print('EmailFetcher.get_eatclub_message: Found Valid Up for Grabs email!')
+                    print(
+                        'EmailFetcher.get_eatclub_message: Found Valid Up for Grabs email!')
                     print(content[:300])
                     message['html_content'] += content
                     break
@@ -283,6 +288,7 @@ def main():
         msg = fetcher.get_eatclub_message(msg_id)
         if msg:
             print(msg.keys())
+        assert(fetcher.mark_message_read(msg_id))
 
 
 if __name__ == '__main__':
