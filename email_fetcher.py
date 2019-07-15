@@ -7,17 +7,30 @@ The email fetcher for PureFreeFood
 from __future__ import print_function
 import pickle
 import os.path
+import datetime as dt
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from apiclient import errors
+from lxml import html
 import base64
 import shelve
 import email
+import pdb
 import re
 
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'openid'
+    # Add other requested scopes.
+]
+# leeway around Noon on when eatclub gets hour food
+EATCLUB_LEEWAY = dt.timedelta(hours=1)
+# leeway after eatclub arrival for upforgrabber to forward us eatclubs
+UPFORGRAB_LEEWAY = dt.timedelta(hours=6)
 
 
 class EmailFetcher(object):
@@ -44,11 +57,15 @@ class EmailFetcher(object):
                 pickle.dump(creds, token)
 
         self.service = build('gmail', 'v1', credentials=creds)
-        self.msg_id_db = shelve.open('msg_id_shelf')
         self.sender_regex = re.compile('(.*) <(.*@purestorage\.com)>')
-
-    def __del__(self):
-        self.msg_id_db.close()
+        self.date_regex = re.compile('^Date: (.*)$')
+        # Fri, Jun 28, 2019 at 11:59 AM
+        self.eatclub_date_format = '%a, %b %d, %Y at %I:%M %p'
+        # Thu, 27 Jun 2019 11:43:27 -0700
+        self.forward_date_format1 = '%a, %d %b %Y %X %z (%Z)'
+        self.forward_date_format2 = '%a, %d %b %Y %X %z'
+        self.read_labels = {'removeLabelIds': ['UNREAD'],
+                            'addLabelIds': ['INBOX']}
 
     def get_unread_message_ids(self):
         """List all Messages of the user's mailbox matching the query.
@@ -59,16 +76,16 @@ class EmailFetcher(object):
         unread_messages = ListMessagesMatchingQuery(
             self.service, 'me', query='is:unread')
         msg_ids = map(lambda m: m['id'], unread_messages)
-        return filter(lambda key: key not in self.msg_id_db, msg_ids)
+        return msg_ids
 
-    def get_message(self, msg_id):
-        """Get a Message and returns a Mime Message.
+    def get_eatclub_message(self, msg_id):
+        """Get a Message and returns a Mime Message if it's an EATClub message.
 
         Args:
           msg_id: The ID of the Message required.
 
         Returns:
-          A dictionary {
+          A dictionary if the email is from EATClub else None {
             'sender_name' (str): The name of the sender
             'sender_address' (str): The address of the sender
             'html_content' (HTML str): The HTML content of the message in string format
@@ -82,24 +99,61 @@ class EmailFetcher(object):
         print(sender)
         result = self.sender_regex.match(sender)
         if not result:
-            raise ValueError(
-                'EmailFetcher.get_message: Unable to parse sender %s' % sender)
+            print(
+                'EmailFetcher.get_eatclub_message: Unable to parse sender %s as Pure Storage account' % sender)
+            return None
         message['sender_name'], message['sender_address'] = result.groups()
         # set html_content
-        message['html_content'] = ''
+        message['html_content'] = None
         for part in mime_message.get_payload():
             if part.get_content_type() == 'text/html':
-                message['html_content'] += part.get_payload()
+                if message['html_content'] is None:
+                    message['html_content'] = ''
+                try:
+                    forward_date = dt.datetime.strptime(
+                        mime_message['Date'], self.forward_date_format1).replace(tzinfo=None)
+                except ValueError:
+                    forward_date = dt.datetime.strptime(
+                        mime_message['Date'], self.forward_date_format2).replace(tzinfo=None)
+                content = part.get_payload()
+                if self._is_valid_eatclub_content(content, forward_date):
+                    print('EmailFetcher.get_eatclub_message: Found Valid Up for Grabs email!')
+                    print(content[:300])
+                    message['html_content'] += content
+                    break
+        if message['html_content'] is None:
+            print('EmailFetcher.get_eatclub_message: Content not found')
+            return None
         return message
 
-    def mark_message_read(self, msg_id):
-        """Marks the given Message unread.
+    def _is_valid_eatclub_content(self, content, forward_date):
+        ''' Given xml content, determines whether or not it is eatclub content that is time relevant '''
+        # check if content is not empty
+        if len(content.strip()) <= 0:
+            return False
+        # check if it is an EAT Club content
+        tree = html.fromstring(content)
+        if len(tree.xpath('//div/strong[contains(text(), "EAT Club")]')) <= 0:
+            return False
 
-        Args:
-          msg_id: The id of the message to mark unread.
-        """
-        self.msg_id_db[msg_id] = True
-        self.msg_id_db.sync()
+        # check if the dates fit the leeways we defined
+        dates = list(
+            filter(None, map(lambda s: self.date_regex.match(s), tree.xpath('//text()'))))
+        if len(dates) <= 0:
+            return False
+        date = dates[0].groups()[0]  # first one because its in the header
+        eatclub_date = dt.datetime.strptime(date, self.eatclub_date_format)
+        noon = dt.datetime.combine(dt.datetime.now().date(), dt.time(12))
+        if eatclub_date.weekday() not in [0, 2, 4]:
+            # not Mon, Wed, or Fri
+            return False
+        if abs(eatclub_date - noon) > EATCLUB_LEEWAY:
+            # past eatclub leeway
+            return False
+        if forward_date < eatclub_date and forward_date - eatclub_date > UPFORGRAB_LEEWAY:
+            # past upforgrab leeway and forward before eatclub (time machine?)
+            return False
+        return True
 
 
 def ListMessagesMatchingQuery(service, user_id, query=''):
@@ -132,7 +186,7 @@ def ListMessagesMatchingQuery(service, user_id, query=''):
 
         return messages
     except errors.HttpError as error:
-        print ('An error occurred: %s' % error)
+        print('An error occurred: %s' % error)
 
 
 def GetHTMLMessage(service, user_id, msg_id):
@@ -174,7 +228,7 @@ def GetMimeMessage(service, user_id, msg_id):
         message = service.users().messages().get(userId=user_id, id=msg_id,
                                                  format='raw').execute()
 
-        print('Message snippet: %s' % message['snippet'])
+        # print('Message snippet: %s' % message['snippet'])
 
         msg_str = base64.urlsafe_b64decode(message['raw'].encode('ASCII'))
 
@@ -210,6 +264,15 @@ def ModifyMessage(service, user_id, msg_id, msg_labels):
         print('An error occurred: %s' % error)
 
 
+def CreateMsgLabels():
+    """Create object to update labels.
+
+    Returns:
+      A label update object.
+    """
+    return None
+
+
 def main():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
@@ -217,7 +280,9 @@ def main():
     fetcher = EmailFetcher()
     unread_ids = fetcher.get_unread_message_ids()
     for msg_id in unread_ids:
-        print(fetcher.get_message(msg_id))
+        msg = fetcher.get_eatclub_message(msg_id)
+        if msg:
+            print(msg.keys())
 
 
 if __name__ == '__main__':
